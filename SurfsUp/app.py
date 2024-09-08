@@ -39,6 +39,8 @@ app = Flask(__name__)
 #################################################
 # Flask Routes
 #################################################
+
+
 @app.route('/')
 def home():
     return (
@@ -53,9 +55,17 @@ def home():
 
 @app.route('/api/v1.0/precipitation')
 def precipitation():
+
+    # Find the most recent date in the data set
+    most_recent_date = session.query(func.max(Measurement.date)).scalar()
+    
+    # Ensure most_recent_date is in correct datetime format
+    most_recent_date = datetime.strptime(most_recent_date, "%Y-%m-%d")
+
+
     # Query for the most recent 12 months of precipitation data
     results = session.query(Measurement.date, Measurement.prcp).\
-        filter(Measurement.date >= (datetime.now() - timedelta(days=366)).strftime('%Y-%m-%d')).all()
+        filter(Measurement.date >= (most_recent_date - timedelta(days=366))).all()
     
     # Convert the results into a dictionary
     precipitation_data = {date: prcp for date, prcp in results}
@@ -75,12 +85,21 @@ def stations():
 @app.route('/api/v1.0/tobs')
 def tobs():
     # Query for temperature observations for the most active station over the last 12 months
-    most_active = session.query(Measurement.station, func.count(Measurement.station)).group_by(Measurement.station).order_by(func.count(Measurement.station).desc()).all()
+    most_active = session.query(Measurement.station, func.count(Measurement.station)).\
+        group_by(Measurement.station).\
+        order_by(func.count(Measurement.station).desc()).all()
+    
     most_active_id = most_active[0][0]
    
+    # Find the most recent date in the data set
+    most_recent_date = session.query(func.max(Measurement.date)).scalar()
+
+    # Ensure most_recent_date is in correct datetime format
+    most_recent_date = datetime.strptime(most_recent_date, "%Y-%m-%d")
+
     results = session.query(Measurement.date, Measurement.tobs).\
         filter(Measurement.station == most_active_id).\
-        filter(Measurement.date >= (datetime.now() - timedelta(days=366)).strftime('%Y-%m-%d')).all()
+        filter(Measurement.date >= (most_recent_date - timedelta(days=366)))
     
     # Convert the results into a list of dictionaries
     tobs_data = [{'date': date, 'temperature': tobs} for date, tobs in results]
